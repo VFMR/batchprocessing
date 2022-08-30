@@ -24,7 +24,8 @@ def batch_predict(method):
             batches = get_batches(kwargs, n_batches)
             other_kwargs = {key: value for key, value in kwargs.items() if key!='X'}
 
-            results, last_iter = check_load_checkpoints()
+            results, last_iter = check_load_checkpoints(checkpoint_path,
+                                                        other_kwargs)
 
             # execute function for each batch
             for i, x in enumerate(tqdm(batches)):
@@ -103,7 +104,7 @@ def check_load_checkpoints(checkpoint_path: str=None,
                            parameter_dict: dict=None) -> Tuple[np.ndarray, int]:
     if checkpoint_path is not None:
         results, last_iter = load_checkpoints(checkpoint_path, 
-                                              parameter_dict=other_kwargs)
+                                              parameter_dict=parameter_dict)
     else:
         results = []
         last_iter = 0

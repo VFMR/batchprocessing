@@ -57,6 +57,21 @@ class TestBatchProc(unittest.TestCase):
         batchprocessing.cleanup_checkpoints(self.myobj.checkpoint_path)
         assert os.path.isdir(self.myobj.checkpoint_path) is False
 
+    def test_load_checkpoints(self):
+        self._setup()
+        x = self.myobj.add(X=self.myobj.df,
+                           n_batches=10,
+                           checkpoint_path=self.myobj.fake_cp_path)
+        assertion_df1 = pd.DataFrame(np.ones((100, 2)))
+        assertion_df1.columns = self.myobj.colnames
+        assertion_df2 = pd.concat(
+            [self.myobj.rnd_df.iloc[:50,:],
+            assertion_df1.iloc[50:,:]],
+            axis=0, ignore_index=True
+        )
+        assert x.shape == (100, 2)
+        assert x.equals(assertion_df1) is False
+        assert np.allclose(x, assertion_df2, rtol=0.0001)
 
 if __name__ == '__main__':
     unittest.main()
