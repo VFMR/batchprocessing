@@ -26,11 +26,11 @@ class MyMonkeyPatch:
 class TestBatchProc(unittest.TestCase):
     def _setup(self):
         self.myobj = MyMonkeyPatch()
-        batchprocessing.check_makedir(self.myobj.fake_cp_path)
+        batchprocessing._check_makedir(self.myobj.fake_cp_path)
         splits = np.array_split(self.myobj.rnd_df, 10)
         for i in range(5):
             splits_df = pd.DataFrame(splits[i])
-            batchprocessing.save_checkpoints(
+            batchprocessing._save_checkpoints(
                 self.myobj.fake_cp_path,
                 iteration=i,
                 df=splits_df
@@ -48,13 +48,13 @@ class TestBatchProc(unittest.TestCase):
 
     def test_check_makedir(self):
         self._setup()
-        batchprocessing.check_makedir(self.myobj.checkpoint_path)
+        batchprocessing._check_makedir(self.myobj.checkpoint_path)
         assert os.path.isdir(self.myobj.checkpoint_path)
 
     def test_cleanup_checkpoints(self):
         self._setup()
-        batchprocessing.check_makedir(self.myobj.checkpoint_path)
-        batchprocessing.cleanup_checkpoints(self.myobj.checkpoint_path)
+        batchprocessing._check_makedir(self.myobj.checkpoint_path)
+        batchprocessing._cleanup_checkpoints(self.myobj.checkpoint_path)
         assert os.path.isdir(self.myobj.checkpoint_path) is False
 
     def test_load_checkpoints(self):
