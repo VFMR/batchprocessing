@@ -1,4 +1,3 @@
-
 from functools import wraps
 import os
 import shutil
@@ -22,7 +21,7 @@ def batch_predict(method):
             output = method(self, *args, **kwargs)
         else:
             # batch processing
-            batches = get_batches(kwargs)
+            batches = get_batches(kwargs, n_batches)
             other_kwargs = {key: value for key, value in kwargs.items() if key!='X'}
 
             results, last_iter = check_load_checkpoints()
@@ -48,7 +47,7 @@ def batch_predict(method):
     return _wrapper
 
 
-def get_batches(kwargs: dict) -> np.ndarray:
+def get_batches(kwargs: dict, n_batches: int) -> np.ndarray:
     data = kwargs['X']
     batches = np.array_split(data, n_batches)
     return batches
@@ -86,7 +85,6 @@ def get_n_batches(kwargs: dict) -> int:
         >>> get_n_batches({'n_batches': 5})
         5
         >>> get_n_batches({'A': 10})
-        None
 
     Args:
         kwargs (dict): Keywords arguments to the decorated function.
@@ -158,8 +156,6 @@ def save_checkpoints(path_base: str,
     with open(os.path.join(path_base, 'checkpoint.json'), 'w') as f:
         f.write(json.dumps(checkpoint))
 
-    # with open(path_base+'.p', 'wb') as f:
-    #     pickle.dump(iteration, f)
     df.to_csv(os.path.join(path_base, f'cp_{iteration}.csv.gz'))
 
 
