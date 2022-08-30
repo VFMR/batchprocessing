@@ -1,7 +1,9 @@
+
 from functools import wraps
 import os
 import shutil
 import json
+from typing import Tuple
 
 from tqdm import tqdm
 import numpy as np
@@ -11,33 +13,19 @@ import pandas as pd
 def batch_predict(method):
     @wraps(method)
     def _wrapper(self, *args, **kwargs):
-        if 'n_batches' in kwargs.keys():
-            n_batches = kwargs['n_batches']
-        else:
-            n_batches = None
 
-        if 'checkpoint_path' in kwargs.keys():
-            checkpoint_path = kwargs['checkpoint_path']
-        else:
-            checkpoint_path = None
-
-        if checkpoint_path is None:  # use the current working dir
-            checkpoint_path = ''
-
+        checkpoint_path = get_checkpoint_path(kwargs)
+        n_batches = get_n_batches(kwargs)
 
         if n_batches is None:
             # no batch processing. Execute method normally.
             output = method(self, *args, **kwargs)
         else:
             # batch processing
-            data = kwargs['X']
-            batches = np.array_split(data, n_batches)
+            batches = get_batches(kwargs)
             other_kwargs = {key: value for key, value in kwargs.items() if key!='X'}
 
-            if checkpoint_path is not None:
-                results, last_iter = load_checkpoints(checkpoint_path, parameter_dict=other_kwargs)
-            else:
-                results = []
+            results, last_iter = check_load_checkpoints()
 
             # execute function for each batch
             for i, x in enumerate(tqdm(batches)):
@@ -58,6 +46,70 @@ def batch_predict(method):
         return output
 
     return _wrapper
+
+
+def get_batches(kwargs: dict) -> np.ndarray:
+    data = kwargs['X']
+    batches = np.array_split(data, n_batches)
+    return batches
+
+
+def get_checkpoint_path(kwargs: dict) -> str:
+    """Retrieve checkpoint path from passed keyword dict
+
+    Example:
+        >>> get_checkpoint_path({'checkpoint_path': '~/path/to/checkpoints/'})
+        '~/path/to/checkpoints/'
+        >>> get_checkpoint_path({'A': 'B'})
+        ''
+
+    Args:
+        kwargs (dict): Keyword arguments to the decorated function
+
+    Returns: 
+        str: String with the directory for checkpoints
+    """
+    if 'checkpoint_path' in kwargs.keys():
+        checkpoint_path = kwargs['checkpoint_path']
+    else:
+        checkpoint_path = None
+
+    if checkpoint_path is None:  # use the current working dir
+        checkpoint_path = ''
+    return checkpoint_path
+
+
+def get_n_batches(kwargs: dict) -> int:
+    """Retrieve number of batches from passed keyword dict
+    
+    Example:
+        >>> get_n_batches({'n_batches': 5})
+        5
+        >>> get_n_batches({'A': 10})
+        None
+
+    Args:
+        kwargs (dict): Keywords arguments to the decorated function.
+
+    Returns:
+        int: Number of batches to split the data into and process.
+    """
+    if 'n_batches' in kwargs.keys():
+        n_batches = kwargs['n_batches']
+    else:
+        n_batches = None
+    return n_batches
+
+
+def check_load_checkpoints(checkpoint_path: str=None, 
+                           parameter_dict: dict=None) -> Tuple[np.ndarray, int]:
+    if checkpoint_path is not None:
+        results, last_iter = load_checkpoints(checkpoint_path, 
+                                              parameter_dict=other_kwargs)
+    else:
+        results = []
+        last_iter = 0
+    return results, last_iter
 
 
 def load_checkpoints(path_base: str, parameter_dict: dict=None):
@@ -129,3 +181,4 @@ def cleanup_checkpoints(path: str) -> None:
     """
     if os.path.isdir(path):
         shutil.rmtree(path)
+
