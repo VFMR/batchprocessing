@@ -69,10 +69,7 @@ def get_checkpoint_path(kwargs: dict) -> str:
     Returns: 
         str: String with the directory for checkpoints
     """
-    if 'checkpoint_path' in kwargs.keys():
-        checkpoint_path = kwargs['checkpoint_path']
-    else:
-        checkpoint_path = None
+    checkpoint_path = kwargs.get('checkpoint_path')
 
     if checkpoint_path is None:  # use the current working dir
         checkpoint_path = ''
@@ -93,11 +90,7 @@ def get_n_batches(kwargs: dict) -> int:
     Returns:
         int: Number of batches to split the data into and process.
     """
-    if 'n_batches' in kwargs.keys():
-        n_batches = kwargs['n_batches']
-    else:
-        n_batches = None
-    return n_batches
+    return kwargs.get('n_batches')
 
 
 def check_load_checkpoints(checkpoint_path: str=None, 
