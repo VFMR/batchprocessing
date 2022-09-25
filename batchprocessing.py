@@ -33,7 +33,10 @@ def batch_predict(method):
                     continue
                 iter_output = method(self, *args, X=x, **other_kwargs)
                 results.append(iter_output)
-                _save_checkpoints(checkpoint_path, iteration=i, df=iter_output, parameter_dict=other_kwargs)
+                _save_checkpoints(checkpoint_path,
+                                  iteration=i,
+                                  df=iter_output,
+                                  parameter_dict=other_kwargs)
 
             # combine individual batch results into one matrix
             # TODO: implement a way to combine individual results when function returns multiple values (tuple)
@@ -66,7 +69,7 @@ def _get_checkpoint_path(kwargs: dict) -> str:
     Args:
         kwargs (dict): Keyword arguments to the decorated function
 
-    Returns: 
+    Returns:
         str: String with the directory for checkpoints
     """
     checkpoint_path = kwargs.get('checkpoint_path')
@@ -76,9 +79,9 @@ def _get_checkpoint_path(kwargs: dict) -> str:
     return checkpoint_path
 
 
-def _get_n_batches(kwargs: dict) -> int:
+def _get_n_batches(kwargs: dict, default=25) -> int:
     """Retrieve number of batches from passed keyword dict
-    
+
     Example:
         >>> _get_n_batches({'n_batches': 5})
         5
@@ -86,17 +89,22 @@ def _get_n_batches(kwargs: dict) -> int:
 
     Args:
         kwargs (dict): Keywords arguments to the decorated function.
+        default: value to resort to if n_batches has not been passed.
 
     Returns:
         int: Number of batches to split the data into and process.
     """
+    n_batches = kwargs.get('n_batches')
+    if n_batches is None:
+        n_batches = default
     return kwargs.get('n_batches')
 
 
-def _check_load_checkpoints(checkpoint_path: str=None, 
-                           parameter_dict: dict=None) -> Tuple[np.ndarray, int]:
+def _check_load_checkpoints(checkpoint_path: str=None,
+                           parameter_dict: dict=None
+                           ) -> Tuple[np.ndarray, int]:
     if checkpoint_path is not None:
-        results, last_iter = _load_checkpoints(checkpoint_path, 
+        results, last_iter = _load_checkpoints(checkpoint_path,
                                               parameter_dict=parameter_dict)
     else:
         results = []
