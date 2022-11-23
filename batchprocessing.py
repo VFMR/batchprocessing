@@ -35,15 +35,31 @@ def batch_predict(method):
                 last_iter = 0
 
             # execute function for each batch
-            for i, x in enumerate(tqdm(batches)):
-                if i <= last_iter and last_iter>0:
-                    continue
-                iter_output = method(self, *args, X=x, **other_kwargs)
-                # results.append(iter_output)
-                _save_checkpoints(checkpoint_path,
-                                  iteration=i,
-                                  df=iter_output,
-                                  parameter_dict=other_kwargs)
+            if n_jobs is not None and n_jobs>1:
+                Parallel(n_jobs=n_jobs)(
+                    delayed(_iterfunc)(
+                        self=self,
+                        x=x,
+                        method=method,
+                        args=args,
+                        other_kwargs=other_kwargs,
+                        checkpoint_path=checkpoint_path,
+                        i=i
+                    ) for i, x in enumerate(tqdm(batches)))
+            else:
+                for i, x in enumerate(tqdm(batches)):
+                    _iterfunc(self=self, x=x, method=method, args=args,
+                              other_kwargs=other_kwargs,
+                              checkpoint_path=checkpoint_path, i=i)
+            # for i, x in enumerate(tqdm(batches)):
+            #     if i <= last_iter and last_iter>0:
+            #         continue
+            #     iter_output = method(self, *args, X=x, **other_kwargs)
+            #     # results.append(iter_output)
+            #     _save_checkpoints(checkpoint_path,
+            #                       iteration=i,
+            #                       df=iter_output,
+            #                       parameter_dict=other_kwargs)
 
             # combine individual batch results into one matrix
             # TODO: implement a way to combine individual results when function returns multiple values (tuple)
@@ -60,13 +76,14 @@ def batch_predict(method):
     return _wrapper
 
 
-def _iterfunc(self, x, method, args, other_kwargs, checkpoint_path, i):
+def _iterfunc(self, x, method, args, other_kwargs, checkpoint_path, i, n_batches):
     iter_output = method(self, *args, X=x, **other_kwargs)
     # results.append(iter_output)
     _save_checkpoints(checkpoint_path,
                         iteration=i,
                         df=iter_output,
-                        parameter_dict=other_kwargs)
+                        parameter_dict=other_kwargs,
+                        n_batches=n_batches)
     return iter_output
 
 
