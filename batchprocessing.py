@@ -19,7 +19,7 @@ def batch_predict(method):
         n_jobs = _get_n_jobs(kwargs)
         do_load_cp = _get_do_load_cp(kwargs)
 
-        if n_batches is None:
+        if n_batches is None or n_batches==1:
             # no batch processing. Execute method normally.
             output = method(self, *args, **kwargs)
         else:
@@ -29,10 +29,18 @@ def batch_predict(method):
 
             if do_load_cp:
                 _, last_iter = _check_load_checkpoints(checkpoint_path,
-                                                            other_kwargs)
-                batches = _get_unprocessed_batches(last_iter, batches)
+                                                       other_kwargs,
+                                                       n_batches=n_batches)
             else:
-                last_iter = 0
+                last_iter = None
+
+            if last_iter is None:
+                first_iter = 0
+            else:
+                first_iter = last_iter + 1
+                batches = _get_unprocessed_batches(last_iter, batches)
+
+            _check_makedir(checkpoint_path)
 
             # execute function for each batch
             if n_jobs is not None and n_jobs>1:
@@ -44,32 +52,27 @@ def batch_predict(method):
                         args=args,
                         other_kwargs=other_kwargs,
                         checkpoint_path=checkpoint_path,
-                        i=i
+                        i=i+first_iter,
+                        n_batches=n_batches
                     ) for i, x in enumerate(tqdm(batches)))
             else:
                 for i, x in enumerate(tqdm(batches)):
                     _iterfunc(self=self, x=x, method=method, args=args,
                               other_kwargs=other_kwargs,
-                              checkpoint_path=checkpoint_path, i=i)
-            # for i, x in enumerate(tqdm(batches)):
-            #     if i <= last_iter and last_iter>0:
-            #         continue
-            #     iter_output = method(self, *args, X=x, **other_kwargs)
-            #     # results.append(iter_output)
-            #     _save_checkpoints(checkpoint_path,
-            #                       iteration=i,
-            #                       df=iter_output,
-            #                       parameter_dict=other_kwargs)
+                              checkpoint_path=checkpoint_path,
+                              i=i+first_iter,
+                              n_batches=n_batches)
 
             # combine individual batch results into one matrix
             # TODO: implement a way to combine individual results when function returns multiple values (tuple)
             results, last_iter = _check_load_checkpoints(checkpoint_path,
-                                                        other_kwargs)
+                                                        other_kwargs,
+                                                        n_batches=n_batches)
             output = pd.concat(results,
                                axis=0,
                                ignore_index=True)
 
-        _cleanup_checkpoints(checkpoint_path)
+            _cleanup_checkpoints(checkpoint_path)
 
         return output
 
@@ -84,16 +87,16 @@ def _iterfunc(self, x, method, args, other_kwargs, checkpoint_path, i, n_batches
                         df=iter_output,
                         parameter_dict=other_kwargs,
                         n_batches=n_batches)
-    return iter_output
+    # return iter_output
 
 
 def _get_unprocessed_batches(last_iter, batches):
-    new_batches = []
-    for i, x in enumerate(batches):
-        if i <= last_iter and last_iter > 0:
-            continue
-        else:
-            new_batches.append(x)
+    new_batches = batches[last_iter+1:]
+    # for i, x in enumerate(batches):
+    #     if i <= last_iter and last_iter > 0:
+    #         continue
+    #     else:
+    #         new_batches.append(x)
     return new_batches
 
 
@@ -141,7 +144,7 @@ def _get_checkpoint_path(kwargs: dict, default: str='') -> str:
     return _get_default_value(kwargs, 'checkpoint_path', default)
 
 
-def _get_n_batches(kwargs: dict, default=None) -> int:
+def _get_n_batches(kwargs: dict, default=1) -> int:
     """Retrieve number of batches from passed keyword dict
 
     Example:
@@ -174,24 +177,27 @@ def _get_n_jobs(kwargs: dict, default=1) -> int:
 
 
 def _check_load_checkpoints(checkpoint_path: str=None,
-                           parameter_dict: dict=None
-                           ) -> Tuple[np.ndarray, int]:
+                           parameter_dict: dict=None,
+                           n_batches: int = None) -> Tuple[np.ndarray, int]:
     if checkpoint_path is not None:
         results, last_iter = _load_checkpoints(checkpoint_path,
-                                              parameter_dict=parameter_dict)
+                                              parameter_dict=parameter_dict,
+                                              n_batches=n_batches)
     else:
         results = []
-        last_iter = 0
+        last_iter = None
     return results, last_iter
 
 
-def _load_checkpoints(path_base: str, parameter_dict: dict=None):
+def _load_checkpoints(path_base: str,
+                      parameter_dict: dict = None,
+                      n_batches: int = None):
     df_list = []
 
     try:
         with open(os.path.join(path_base, 'checkpoint.json'), 'r') as f:
             checkpoint = json.loads(f.read())
-        if 'last_iter' in checkpoint.keys() and isinstance(checkpoint['last_iter'], int):
+        if isinstance(checkpoint.get('last_iter'), int):
             cp_found = True
         else:
             print(f'Incompatible checkpoint value {checkpoint}')
@@ -201,9 +207,6 @@ def _load_checkpoints(path_base: str, parameter_dict: dict=None):
         print(e)
         print('Checkpoint file not found, starting from beginning')
         cp_found = False
-        checkpoint = {'last_iter': 0}
-        if parameter_dict is not None:
-            checkpoint.update(parameter_dict)
 
     if cp_found:
         # check if the different parameters have been used:
@@ -213,16 +216,31 @@ def _load_checkpoints(path_base: str, parameter_dict: dict=None):
                     raise ValueError(f'Attempting to continue with different parameters. Loaded value of {key} is {checkpoint[key]} but you passed {value}. Aborting. Manually delete the checkpoint directory or adjust the parameters to continue.')
 
         for iteration in range(checkpoint['last_iter']+1):
-            df_list.append(pd.read_csv(os.path.join(path_base, f'cp_{iteration}.csv.gz'), index_col=0))
+            padded_iteration = _get_padded_iterator(iteration, n_batches)
+            df_list.append(pd.read_csv(os.path.join(path_base, f'cp_{padded_iteration}.csv.gz'), index_col=0))
+    else:
+        checkpoint = {'last_iter': None}
+        if parameter_dict is not None:
+            checkpoint.update(parameter_dict)
 
     return df_list, checkpoint['last_iter']
+
+
+def _get_padded_iterator(iteration: int, n_batches: int):
+    if not isinstance(n_batches, int):
+        raise ValueError(f'Integer expected for the number of batches but received {type(n_batches)} instead.')
+    digits = len(str(n_batches))
+    iteration_padded = str(iteration).zfill(digits)
+    return iteration_padded
 
 
 def _save_checkpoints(path_base: str,
                      iteration: int,
                      df: Union[pd.DataFrame, np.ndarray],
-                     parameter_dict: dict=None) -> None:
-    _check_makedir(path_base)
+                     parameter_dict: dict = None,
+                     n_batches: int = None) -> None:
+
+    padded_iteration = _get_padded_iterator(iteration, n_batches)
 
     checkpoint = {'last_iter': iteration}
     if parameter_dict is not None:
@@ -230,7 +248,7 @@ def _save_checkpoints(path_base: str,
 
     if not isinstance(df, pd.DataFrame):
         df = pd.DataFrame(df)
-    df.to_csv(os.path.join(path_base, f'cp_{iteration}.csv.gz'))
+    df.to_csv(os.path.join(path_base, f'cp_{padded_iteration}.csv.gz'))
 
     # export the checkpoint iterator last
     with open(os.path.join(path_base, 'checkpoint.json'), 'w') as f:
@@ -244,7 +262,7 @@ def _check_makedir(path: str) -> None:
         path (str): Path to directory
     """
     if not os.path.isdir(path):
-        os.mkdir(path)
+        os.makedirs(path, exist_ok=True)
 
 
 def _cleanup_checkpoints(path: str) -> None:
