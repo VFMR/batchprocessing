@@ -3,9 +3,17 @@ from setuptools import setup
 
 setup(
     name='batchprocessing',
-    version='0.1',
+    version='0.2',
     py_modules=['batchprocessing'],
     author='Valentin Reich',
     license='MIT',
-    install_requires=['tqdm', 'numpy', 'pandas']
+    install_requires=['tqdm', 
+                      'numpy', 
+                      'pandas'],
+    extras_require={
+        'dev': [
+            'pytest',
+            'black'
+            ]
+        }
         )
