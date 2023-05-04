@@ -2,7 +2,7 @@ from functools import wraps
 import os
 import shutil
 import json
-from typing import Tuple, Union
+from typing import Union
 from joblib import Parallel, delayed
 
 from tqdm import tqdm
@@ -17,14 +17,17 @@ class BatchProcessor:
                  do_load_cp: bool = True,
                  n_jobs: int = 1) -> None:
         self._n_batches = n_batches
-        self._checkpoint_path =  checkpoint_path
+        self._checkpoint_path = checkpoint_path
         self._do_load_cp = do_load_cp
         self._n_jobs = n_jobs
 
     def batch_predict(self, method):
         @wraps(method)
         def _wrapper(predictor_self, *args, **kwargs):
-            output = self._batch_predict_func(predictor_self, method, args, kwargs)
+            output = self._batch_predict_func(predictor_self,
+                                              method,
+                                              args,
+                                              kwargs)
             return output
         return _wrapper
 
@@ -34,14 +37,14 @@ class BatchProcessor:
             output = method(predictor_self, *args, **kwargs)
         else:
             # batch processing:
-            batches, first_iter = self._get_remaining_batches_and_iterator(kwargs)
+            batches, frst_it = self._get_remaining_batches_and_iterator(kwargs)
             self._check_makedir()
 
             last_iter = self._get_last_iter(kwargs)
             other_kwargs = self._get_other_kwargs(kwargs)
 
             # execute function for each batch
-            if self._n_jobs is not None and self._n_jobs>1:
+            if self._n_jobs is not None and self._n_jobs > 1:
                 Parallel(n_jobs=self._n_jobs)(
                     delayed(self._iterfunc)(
                         predictor_self=predictor_self,
@@ -49,20 +52,22 @@ class BatchProcessor:
                         method=method,
                         args=args,
                         other_kwargs=other_kwargs,
-                        i=i+first_iter,
+                        i=i+frst_it,
                     ) for i, x in enumerate(tqdm(batches)))
             else:
                 for i, x in enumerate(tqdm(batches)):
                     self._iterfunc(predictor_self=predictor_self,
-                                    x=x,
-                                    method=method,
-                                    args=args,
-                                    other_kwargs=other_kwargs,
-                                    i=i+first_iter,
-                                    )
+                                   x=x,
+                                   method=method,
+                                   args=args,
+                                   other_kwargs=other_kwargs,
+                                   i=i+frst_it,
+                                   )
 
             # combine individual batch results into one matrix
-            # TODO: implement a way to combine individual results when function returns multiple values (tuple)
+            # TODO: implement a way to combine individual results when function
+            # returns multiple values (tuple)
+            last_iter = self._get_last_iter(kwargs)
             results = self._load_result_checkpoints(last_iter=last_iter)
             output = pd.concat(results, axis=0, ignore_index=True)
 
@@ -72,7 +77,9 @@ class BatchProcessor:
 
     def _get_remaining_batches_and_iterator(self, kwargs):
         batches = self._get_batches(kwargs, n_batches=self._n_batches)
-        other_kwargs = {key: value for key, value in kwargs.items() if key!='X'}
+        other_kwargs = {
+                key: value for key, value in kwargs.items() if key != 'X'
+                }
 
         if self._do_load_cp:
             last_iter = self._get_last_iter(parameter_dict=other_kwargs)
@@ -112,12 +119,17 @@ class BatchProcessor:
 
     @staticmethod
     def _get_other_kwargs(kwargs):
-        return {key: value for key, value in kwargs.items() if key!='X'}
+        return {key: value for key, value in kwargs.items() if key != 'X'}
 
     def _get_last_iter(self, parameter_dict):
+        checkpoint = {}
         if self._checkpoint_path is not None:
             try:
-                with open(os.path.join(self._checkpoint_path, 'checkpoint.json'), 'r') as f:
+                with open(
+                        os.path.join(
+                            self._checkpoint_path,
+                            'checkpoint.json'),
+                        'r', encoding='utf8') as f:
                     checkpoint = json.loads(f.read())
                 if isinstance(checkpoint.get('last_iter'), int):
                     cp_found = True
@@ -151,7 +163,10 @@ class BatchProcessor:
         if last_iter is not None:
             for iteration in range(last_iter+1):
                 padded_iteration = self._get_padded_iterator(iteration)
-                df_list.append(pd.read_csv(os.path.join(self._checkpoint_path, f'cp_{padded_iteration}.csv.gz'), index_col=0))
+                df_list.append(pd.read_csv(
+                    os.path.join(self._checkpoint_path,
+                                 f'cp_{padded_iteration}.csv.gz'),
+                    index_col=0))
 
         return df_list
 
@@ -163,10 +178,10 @@ class BatchProcessor:
         return iteration_padded
 
     def _save_checkpoints(self,
-                        iteration: int,
-                        df: Union[pd.DataFrame, np.ndarray],
-                        parameter_dict: dict = None,
-                        ) -> None:
+                          iteration: int,
+                          df: Union[pd.DataFrame, np.ndarray],
+                          parameter_dict: dict = None,
+                          ) -> None:
 
         padded_iteration = self._get_padded_iterator(iteration)
 
@@ -176,10 +191,13 @@ class BatchProcessor:
 
         if not isinstance(df, pd.DataFrame):
             df = pd.DataFrame(df)
-        df.to_csv(os.path.join(self._checkpoint_path, f'cp_{padded_iteration}.csv.gz'))
+        df.to_csv(os.path.join(self._checkpoint_path,
+                               f'cp_{padded_iteration}.csv.gz'))
 
         # export the checkpoint iterator last
-        with open(os.path.join(self._checkpoint_path, 'checkpoint.json'), 'w') as f:
+        with open(os.path.join(self._checkpoint_path, 'checkpoint.json'),
+                  'w',
+                  encoding='utf8') as f:
             f.write(json.dumps(checkpoint))
 
     def _check_makedir(self) -> None:
@@ -200,7 +218,7 @@ class BatchProcessor:
         if os.path.isdir(self._checkpoint_path):
             shutil.rmtree(self._checkpoint_path)
 
-    #---------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     # classmethods:
     @classmethod
     def batch_predict_auto(cls, method):
@@ -223,6 +241,8 @@ class BatchProcessor:
             if do_load_cp is not None:
                 instance._do_load_cp = do_load_cp
 
-            return instance._batch_predict_func(predictor_self, method, args, kwargs)
+            return instance._batch_predict_func(predictor_self,
+                                                method,
+                                                args,
+                                                kwargs)
         return _wrapper
-
