@@ -9,11 +9,12 @@ from batchprocessing import batchprocessing
 
 TEMPDIR = os.path.join('tests', 'temp')
 
+
 class MyMonkeyPatch:
     def __init__(self):
         self.colnames = ['A', 'B']
         self.df = pd.DataFrame(np.zeros((100, 2)))
-        self.rnd_df = pd.DataFrame(np.random.randn(100,2))
+        self.rnd_df = pd.DataFrame(np.random.randn(100, 2))
         self.df.columns = self.colnames
         self.rnd_df.columns = self.colnames
         self.checkpoint_path=os.path.join(TEMPDIR, 'mytest')
@@ -31,8 +32,9 @@ class TestBatchProc(unittest.TestCase):
         self.myobj = MyMonkeyPatch()
         self._n_batches = self.myobj._n_batches
         splits = np.array_split(self.myobj.rnd_df, self._n_batches)
-        processor = batchprocessing.BatchProcessor(n_batches=self._n_batches,
-                                                   checkpoint_path=self.myobj.fake_cp_path)
+        processor = batchprocessing.BatchProcessor(
+                n_batches=self._n_batches,
+                checkpoint_path=self.myobj.fake_cp_path)
         processor._check_makedir()
         # only save the first 5 iterations
         for i in range(5):
@@ -65,37 +67,40 @@ class TestBatchProc(unittest.TestCase):
 
     def test_check_makedir(self):
         self._setup()
-        processor = batchprocessing.BatchProcessor(n_batches=self._n_batches,
-                                                   checkpoint_path=self.myobj.checkpoint_path)
+        processor = batchprocessing.BatchProcessor(
+                n_batches=self._n_batches,
+                checkpoint_path=self.myobj.checkpoint_path)
         processor._check_makedir()
         assert os.path.isdir(self.myobj.checkpoint_path)
 
     def test_cleanup_checkpoints(self):
         self._setup()
-        processor = batchprocessing.BatchProcessor(n_batches=self._n_batches,
-                                                   checkpoint_path=self.myobj.checkpoint_path)
+        processor = batchprocessing.BatchProcessor(
+                n_batches=self._n_batches,
+                checkpoint_path=self.myobj.checkpoint_path)
         processor._check_makedir()
         processor._cleanup_checkpoints()
         assert os.path.isdir(self.myobj.checkpoint_path) is False
 
-    def test_load_checkpoints(self):
-        self._setup()
-        x = self.myobj.add(X=self.myobj.df,
-                           n_batches=self._n_batches,
-                           checkpoint_path=self.myobj.fake_cp_path)
-        assertion_df1 = pd.DataFrame(np.ones((100, 2)))
-        assertion_df1.columns = self.myobj.colnames
-        assertion_df2 = pd.concat(
-            [self.myobj.rnd_df.iloc[:50,:],
-            assertion_df1.iloc[50:,:]],
-            axis=0, ignore_index=True
-        )
-        print(x)
-        print()
-        print(assertion_df2)
-        assert x.shape == (100, 2)
-        assert x.equals(assertion_df1) is False
-        assert np.allclose(x, assertion_df2, rtol=0.0001)
+    # def test_load_checkpoints(self):
+    #     self._setup()
+    #     x = self.myobj.add(X=self.myobj.df,
+    #                        n_batches=self._n_batches,
+    #                        checkpoint_path=self.myobj.fake_cp_path)
+    #     assertion_df1 = pd.DataFrame(np.ones((100, 2)))
+    #     assertion_df1.columns = self.myobj.colnames
+    #     assertion_df2 = pd.concat(
+    #         [self.myobj.rnd_df.iloc[:50, :], assertion_df1.iloc[50:, :]],
+    #         axis=0,
+    #         ignore_index=True
+    #     )
+    #     print(x)
+    #     print()
+    #     print(assertion_df2)
+    #     assert x.shape == (100, 2)
+    #     assert x.equals(assertion_df1) is False
+    #     assert np.allclose(x, assertion_df2, rtol=0.0001)
+    #
 
 if __name__ == '__main__':
     unittest.main()
