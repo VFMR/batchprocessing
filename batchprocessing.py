@@ -16,11 +16,13 @@ class BatchProcessor:
                  n_batches: int = 1,
                  checkpoint_path: str = '',
                  do_load_cp: bool = True,
-                 n_jobs: int = 1) -> None:
+                 n_jobs: int = 1,
+                 progress_bar: bool = True) -> None:
         self._n_batches = n_batches
         self._checkpoint_path = checkpoint_path
         self._do_load_cp = do_load_cp
         self._n_jobs = n_jobs
+        self._progress_bar = progress_bar
 
     def batch_predict(self, method):
         if inspect.ismethod(method):
@@ -43,18 +45,12 @@ class BatchProcessor:
 
     def _batch_predict_func(self, predictor_self, method, args, kwargs):
         if self._n_batches is None or self._n_batches == 1:
-            print('Method: ', method)
-            print('Predictor self: ', predictor_self)
-            print('Args: ', args)
-            print('Kwargs: ', kwargs)
             # execute normally
             if predictor_self is not None:
                 output = method(predictor_self, *args, **kwargs)
             else:
                 output = method(*args, **kwargs)
-                print('Output: ', output)
         else:
-            print(method)
             # batch processing:
             batches, frst_it = self._get_remaining_batches_and_iterator(kwargs)
             self._check_makedir()
@@ -64,24 +60,46 @@ class BatchProcessor:
 
             # execute function for each batch
             if self._n_jobs is not None and self._n_jobs > 1:
-                Parallel(n_jobs=self._n_jobs)(
-                    delayed(self._iterfunc)(
-                        predictor_self=predictor_self,
-                        x=x,
-                        method=method,
-                        args=args,
-                        other_kwargs=other_kwargs,
-                        i=i+frst_it,
-                    ) for i, x in enumerate(tqdm(batches)))
+                if self._progress_bar:
+                    Parallel(n_jobs=self._n_jobs)(
+                        delayed(self._iterfunc)(
+                            predictor_self=predictor_self,
+                            x=x,
+                            method=method,
+                            args=args,
+                            other_kwargs=other_kwargs,
+                            i=i+frst_it,
+                        ) for i, x in enumerate(tqdm(batches)))
+                else:
+                    Parallel(n_jobs=self._n_jobs)(
+                        delayed(self._iterfunc)(
+                            predictor_self=predictor_self,
+                            x=x,
+                            method=method,
+                            args=args,
+                            other_kwargs=other_kwargs,
+                            i=i+frst_it,
+                        ) for i, x in enumerate(batches))
+
             else:
-                for i, x in enumerate(tqdm(batches)):
-                    self._iterfunc(predictor_self=predictor_self,
-                                   x=x,
-                                   method=method,
-                                   args=args,
-                                   other_kwargs=other_kwargs,
-                                   i=i+frst_it,
-                                   )
+                if self._progress_bar:
+                    for i, x in enumerate(tqdm(batches)):
+                        self._iterfunc(predictor_self=predictor_self,
+                                       x=x,
+                                       method=method,
+                                       args=args,
+                                       other_kwargs=other_kwargs,
+                                       i=i+frst_it,
+                                       )
+                else:
+                    for i, x in enumerate(batches):
+                        self._iterfunc(predictor_self=predictor_self,
+                                       x=x,
+                                       method=method,
+                                       args=args,
+                                       other_kwargs=other_kwargs,
+                                       i=i+frst_it,
+                                       )
 
             # combine individual batch results into one matrix
             # TODO: implement a way to combine individual results when function
