@@ -1,4 +1,5 @@
 from functools import wraps
+import inspect
 import os
 import shutil
 import json
@@ -22,20 +23,38 @@ class BatchProcessor:
         self._n_jobs = n_jobs
 
     def batch_predict(self, method):
-        @wraps(method)
-        def _wrapper(predictor_self, *args, **kwargs):
-            output = self._batch_predict_func(predictor_self,
-                                              method,
-                                              args,
-                                              kwargs)
-            return output
+        if inspect.ismethod(method):
+            @wraps(method)
+            def _wrapper(predictor_self, *args, **kwargs):
+                output = self._batch_predict_func(predictor_self=predictor_self,
+                                                  method=method,
+                                                  args=args,
+                                                  kwargs=kwargs)
+                return output
+        else:
+            @wraps(method)
+            def _wrapper(*args, **kwargs):
+                output = self._batch_predict_func(predictor_self=None,
+                                                  method=method,
+                                                  args=args,
+                                                  kwargs=kwargs)
+                return output
         return _wrapper
 
     def _batch_predict_func(self, predictor_self, method, args, kwargs):
         if self._n_batches is None or self._n_batches == 1:
+            print('Method: ', method)
+            print('Predictor self: ', predictor_self)
+            print('Args: ', args)
+            print('Kwargs: ', kwargs)
             # execute normally
-            output = method(predictor_self, *args, **kwargs)
+            if predictor_self is not None:
+                output = method(predictor_self, *args, **kwargs)
+            else:
+                output = method(*args, **kwargs)
+                print('Output: ', output)
         else:
+            print(method)
             # batch processing:
             batches, frst_it = self._get_remaining_batches_and_iterator(kwargs)
             self._check_makedir()
@@ -102,7 +121,10 @@ class BatchProcessor:
                   other_kwargs,
                   i,
                   ):
-        iter_output = method(predictor_self, *args, X=x, **other_kwargs)
+        if predictor_self is not None:
+            iter_output = method(predictor_self, *args, X=x, **other_kwargs)
+        else:
+            iter_output = method(*args, X=x, **other_kwargs)
         self._save_checkpoints(iteration=i,
                                df=iter_output,
                                parameter_dict=other_kwargs)
