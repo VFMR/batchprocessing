@@ -19,6 +19,7 @@ class MyMonkeyPatch:
         self.rnd_df.columns = self.colnames
         self.checkpoint_path=os.path.join(TEMPDIR, 'mytest')
         self.fake_cp_path = os.path.join(TEMPDIR, 'mytest_fake')
+        self._delete_test_path = os.path.join(TEMPDIR, 'delete_test')
         self._n_batches = 10
 
     @batchprocessing.BatchProcessor.batch_predict_auto
@@ -61,7 +62,7 @@ def my_func2(X):
     return X + 1
 
 
-def test_classbased_bp():
+def test_classbased_bp2():
     X1 = pd.DataFrame(np.zeros((100, 2)))
     X2 = pd.DataFrame(np.arange(100))
     result = my_func2(X=X1)
@@ -120,10 +121,10 @@ class TestBatchProc(unittest.TestCase):
         self._setup()
         processor = batchprocessing.BatchProcessor(
                 n_batches=self._n_batches,
-                checkpoint_path=self.myobj.checkpoint_path)
+                checkpoint_path=self.myobj._delete_test_path)
         processor._check_makedir()
         processor._cleanup_checkpoints()
-        assert os.path.isdir(self.myobj.checkpoint_path) is False
+        assert os.path.isdir(self.myobj._delete_test_path) is False
 
     # def test_load_checkpoints(self):
     #     self._setup()
