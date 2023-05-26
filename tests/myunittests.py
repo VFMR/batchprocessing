@@ -27,6 +27,49 @@ class MyMonkeyPatch:
         return X + 1
 
 
+processor = batchprocessing.BatchProcessor(
+        n_batches=1,
+        checkpoint_path=os.path.join(TEMPDIR, 'mytest'),
+        n_jobs=1,
+        do_load_cp=False,
+        )
+
+
+processor2 = batchprocessing.BatchProcessor(
+        n_batches=10,
+        checkpoint_path=os.path.join(TEMPDIR, 'mytest'),
+        n_jobs=2,
+        do_load_cp=False,
+        )
+
+@processor.batch_predict
+def my_func(X):
+    return X + 1
+
+
+def test_classbased_bp():
+    X1 = pd.DataFrame(np.zeros((100, 2)))
+    X2 = pd.DataFrame(np.arange(100))
+    result = my_func(X=X1)
+    assert np.allclose(result, pd.DataFrame(np.ones((100, 2))))
+    result = my_func(X=X2)
+    assert np.allclose(result, pd.DataFrame(np.arange(100))+1)
+
+
+@processor2.batch_predict
+def my_func2(X):
+    return X + 1
+
+
+def test_classbased_bp():
+    X1 = pd.DataFrame(np.zeros((100, 2)))
+    X2 = pd.DataFrame(np.arange(100))
+    result = my_func2(X=X1)
+    assert np.allclose(result, pd.DataFrame(np.ones((100, 2))))
+    result = my_func2(X=X2)
+    assert np.allclose(result, pd.DataFrame(np.arange(100))+1)
+
+
 class TestBatchProc(unittest.TestCase):
     def _setup(self):
         self.myobj = MyMonkeyPatch()
