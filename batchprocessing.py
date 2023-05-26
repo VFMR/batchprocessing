@@ -5,6 +5,7 @@ import shutil
 import json
 from typing import Union
 from joblib import Parallel, delayed
+import glob
 
 from tqdm import tqdm
 import numpy as np
@@ -50,6 +51,7 @@ class BatchProcessor:
                 output = method(predictor_self, *args, **kwargs)
             else:
                 output = method(*args, **kwargs)
+            is_finished = True
         else:
             # batch processing:
             batches, frst_it = self._get_remaining_batches_and_iterator(kwargs)
@@ -105,10 +107,15 @@ class BatchProcessor:
             # TODO: implement a way to combine individual results when function
             # returns multiple values (tuple)
             last_iter = self._get_last_iter(kwargs)
-            results = self._load_result_checkpoints(last_iter=last_iter)
+            # We can pass all=True here, because we only get here if all
+            # iterations have been run
+            results = self._load_result_checkpoints(last_iter=last_iter,
+                                                    all=True)
             output = pd.concat(results, axis=0, ignore_index=True)
-
-            self._cleanup_checkpoints()
+            if len(output) == len(kwargs['X']):
+                self._cleanup_checkpoints()
+            else:
+                raise ValueError('Size of the Output is different from the input size')
 
         return output
 
@@ -197,16 +204,21 @@ class BatchProcessor:
 
         return checkpoint['last_iter']
 
-    def _load_result_checkpoints(self, last_iter):
+    def _load_result_checkpoints(self, last_iter, all=False):
         df_list = []
 
-        if last_iter is not None:
-            for iteration in range(last_iter+1):
-                padded_iteration = self._get_padded_iterator(iteration)
-                df_list.append(pd.read_csv(
-                    os.path.join(self._checkpoint_path,
-                                 f'cp_{padded_iteration}.csv.gz'),
-                    index_col=0))
+        if all:
+            files = glob.glob(os.path.join(self._checkpoint_path, '*.csv.gz'))
+            for f in files:
+                df_list.append(pd.read_csv(f, index_col=0))
+        else:
+            if last_iter is not None:
+                for iteration in range(last_iter+1):
+                    padded_iteration = self._get_padded_iterator(iteration)
+                    df_list.append(pd.read_csv(
+                        os.path.join(self._checkpoint_path,
+                                     f'cp_{padded_iteration}.csv.gz'),
+                        index_col=0))
 
         return df_list
 
