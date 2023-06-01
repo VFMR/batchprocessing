@@ -25,7 +25,7 @@ class BatchProcessor:
         self._n_jobs = n_jobs
         self._progress_bar = progress_bar
 
-    def batch_predict(self, method):
+    def _batch_predict_self(self, method):
         if inspect.ismethod(method):
             @wraps(method)
             def _wrapper(predictor_self, *args, **kwargs):
@@ -298,3 +298,17 @@ class BatchProcessor:
                                                 args,
                                                 kwargs)
         return _wrapper
+
+    @classmethod
+    def batch_predict(cls,
+                      checkpoint_path,
+                      n_batches=10,
+                      n_jobs=1,
+                      do_load_cp=False):
+        def decorator(method):
+            instance = cls(n_jobs=n_jobs,
+                           n_batches=n_batches,
+                           checkpoint_path=checkpoint_path,
+                           do_load_cp=do_load_cp)
+            return instance._batch_predict_self(method)
+        return decorator
