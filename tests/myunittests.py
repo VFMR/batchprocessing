@@ -43,7 +43,7 @@ processor2 = batchprocessing.BatchProcessor(
         do_load_cp=False,
         )
 
-@processor.batch_predict
+@processor._batch_predict_self
 def my_func(X):
     return X + 1
 
@@ -57,8 +57,13 @@ def test_classbased_bp():
     assert np.allclose(result, pd.DataFrame(np.arange(100))+1)
 
 
-@processor2.batch_predict
+@processor2._batch_predict_self
 def my_func2(X):
+    return X + 1
+
+
+@batchprocessing.BatchProcessor.batch_predict(checkpoint_path=os.path.join(TEMPDIR, 'mytest'), n_jobs=2, n_batches=10, do_load_cp=False)
+def my_func3(X):
     return X + 1
 
 
@@ -68,6 +73,12 @@ def test_classbased_bp2():
     result = my_func2(X=X1)
     assert np.allclose(result, pd.DataFrame(np.ones((100, 2))))
     result = my_func2(X=X2)
+    assert np.allclose(result, pd.DataFrame(np.arange(100))+1)
+
+    # my_func3
+    result = my_func3(X=X1)
+    assert np.allclose(result, pd.DataFrame(np.ones((100, 2))))
+    result = my_func3(X=X2)
     assert np.allclose(result, pd.DataFrame(np.arange(100))+1)
 
 
