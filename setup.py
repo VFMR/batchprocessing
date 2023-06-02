@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
     name='batchprocessing',
-    version='0.2',
+    version='0.3',
     py_modules=['batchprocessing'],
     author='Valentin Reich',
     license='MIT',
