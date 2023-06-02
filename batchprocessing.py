@@ -29,10 +29,11 @@ class BatchProcessor:
         if inspect.ismethod(method):
             @wraps(method)
             def _wrapper(predictor_self, *args, **kwargs):
-                output = self._batch_predict_func(predictor_self=predictor_self,
-                                                  method=method,
-                                                  args=args,
-                                                  kwargs=kwargs)
+                output = self._batch_predict_func(
+                        predictor_self=predictor_self,
+                        method=method,
+                        args=args,
+                        kwargs=kwargs)
                 return output
         else:
             @wraps(method)
@@ -51,7 +52,6 @@ class BatchProcessor:
                 output = method(predictor_self, *args, **kwargs)
             else:
                 output = method(*args, **kwargs)
-            is_finished = True
         else:
             # batch processing:
             batches, frst_it = self._get_remaining_batches_and_iterator(kwargs)
@@ -107,15 +107,15 @@ class BatchProcessor:
             # TODO: implement a way to combine individual results when function
             # returns multiple values (tuple)
             last_iter = self._get_last_iter(kwargs)
-            # We can pass all=True here, because we only get here if all
+            # We can pass all_=True here, because we only get here if all
             # iterations have been run
             results = self._load_result_checkpoints(last_iter=last_iter,
-                                                    all=True)
+                                                    all_=True)
             output = pd.concat(results, axis=0, ignore_index=True)
             if len(output) == len(kwargs['X']):
                 self._cleanup_checkpoints()
             else:
-                raise ValueError('Size of the Output is different from the input size')
+                raise ValueError('Output size is different from input size.')
 
         return output
 
@@ -196,7 +196,12 @@ class BatchProcessor:
             if parameter_dict is not None:
                 for key, value in parameter_dict.items():
                     if key in checkpoint.keys() and value != checkpoint[key]:
-                        raise ValueError(f'Attempting to continue with different parameters. Loaded value of {key} is {checkpoint[key]} but you passed {value}. Aborting. Manually delete the checkpoint directory or adjust the parameters to continue.')
+                        raise ValueError(f'Attempting to continue with \
+                                different parameters. Loaded value of {key} \
+                                is {checkpoint[key]} but you passed {value}.\
+                                Aborting. \
+                                Manually delete the checkpkint directory or \
+                                adjust the parameters to continue.')
         else:
             checkpoint = {'last_iter': None}
             # if parameter_dict is not None:
@@ -204,10 +209,10 @@ class BatchProcessor:
 
         return checkpoint['last_iter']
 
-    def _load_result_checkpoints(self, last_iter, all=False):
+    def _load_result_checkpoints(self, last_iter, all_=False):
         df_list = []
 
-        if all:
+        if all_:
             files = glob.glob(os.path.join(self._checkpoint_path, '*.csv.gz'))
             for f in files:
                 df_list.append(pd.read_csv(f, index_col=0))
@@ -224,7 +229,8 @@ class BatchProcessor:
 
     def _get_padded_iterator(self, iteration: int):
         if not isinstance(self._n_batches, int):
-            raise ValueError(f'Integer expected for the number of batches but received {type(self._n_batches)} instead.')
+            raise ValueError(f'Integer expected for the number of batches \
+                             but received {type(self._n_batches)} instead.')
         digits = len(str(self._n_batches))
         iteration_padded = str(iteration).zfill(digits)
         return iteration_padded
@@ -301,10 +307,10 @@ class BatchProcessor:
 
     @classmethod
     def batch_predict(cls,
-                      checkpoint_path,
-                      n_batches=10,
-                      n_jobs=1,
-                      do_load_cp=False):
+                      checkpoint_path: str,
+                      n_batches: int = 10,
+                      n_jobs: int = 1,
+                      do_load_cp: int = False):
         def decorator(method):
             instance = cls(n_jobs=n_jobs,
                            n_batches=n_batches,
